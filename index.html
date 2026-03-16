@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🌲 Coin Forest</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    :root {
+      --grass:      #2d5a1b;
+      --grass2:     #3a7224;
+      --dark:       #0d1f07;
+      --hud-bg:     #0a1805;
+      --hud-border: #4a7c2a;
+      --text:       #c8e6a0;
+      --accent:     #ffd700;
+      --red:        #f87171;
+      --green:      #4ade80;
+      --panel:      #1a3d0a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--dark);
+      font-family: 'Press Start 2P', monospace;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* ── SCREENS ─────────────────────────────────────── */
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+      animation: fadeIn .35s ease;
+    }
+    .screen.active { display: flex; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── MENU ────────────────────────────────────────── */
+    #screen-menu { background: var(--dark); }
+
+    .menu-icon { font-size: 56px; margin-bottom: 10px; animation: bounce 1.6s infinite; }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-10px); }
+    }
+
+    .menu-title {
+      font-size: 22px;
+      color: var(--accent);
+      letter-spacing: 3px;
+      margin-bottom: 6px;
+      text-shadow: 0 0 16px #ffd70088;
+    }
+    .menu-sub {
+      font-size: 8px;
+      color: #7ab55a;
+      margin-bottom: 28px;
+    }
+
+    .info-panel {
+      background: var(--panel);
+      border: 2px solid var(--hud-border);
+      border-radius: 10px;
+      padding: 14px 20px;
+      margin-bottom: 28px;
+      max-width: 320px;
+      font-size: 9px;
+      line-height: 2.4;
+      text-align: left;
+    }
+
+    /* ── BUTTONS ─────────────────────────────────────── */
+    .btn {
+      font-family: 'Press Start 2P', monospace;
+      border: none;
+      border-radius: 8px;
+      padding: 14px 32px;
+      font-size: 13px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: transform .1s, box-shadow .1s;
+      margin: 6px;
+    }
+    .btn:active { transform: scale(.95); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--dark);
+      box-shadow: 0 4px 0 #b8960080;
+    }
+    .btn-primary:hover { box-shadow: 0 6px 0 #b8960080; transform: translateY(-2px); }
+
+    .btn-danger {
+      background: var(--red);
+      color: #fff;
+      box-shadow: 0 4px 0 #b83030;
+    }
+    .btn-success {
+      background: var(--green);
+      color: var(--dark);
+      box-shadow: 0 4px 0 #22a34a;
+    }
+
+    /* ── GAME WRAPPER ────────────────────────────────── */
+    #screen-game {
+      background: var(--dark);
+      padding: 0;
+      justify-content: flex-start;
+    }
+
+    /* ── HUD ─────────────────────────────────────────── */
+    #hud {
+      width: 100%;
+      max-width: 420px;
+      background: var(--hud-bg);
+      border-bottom: 2px solid var(--hud-border);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .hud-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .hud-label { font-size: 6px; color: #7ab55a; }
+    .hud-value { font-size: 11px; color: var(--text); }
+    .hud-value.accent  { color: var(--accent); }
+    .hud-value.danger  { color: var(--red); }
+    .hud-value.success { color: var(--green); }
+
+    /* IQ bar */
+    #iq-bar-wrap {
+      width: 70px;
+      height: 7px;
+      background: #1a3d0a;
+      border: 1px solid var(--hud-border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #iq-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--green);
+      transition: width .6s ease, background .6s ease;
+      border-radius: 4px;
+    }
+
+    /* ── CANVAS ──────────────────────────────────────── */
+    #gameCanvas {
+      display: block;
+      max-width: 420px;
+      width: 100%;
+      image-rendering: pixelated;
+      border-left: 2px solid var(--hud-border);
+      border-right: 2px solid var(--hud-border);
+      cursor: none;
+    }
+
+    /* ── JOYSTICK ────────────────────────────────────── */
+    #joystick-zone {
+      width: 100%;
+      max-width: 420px;
+      height: 120px;
+      background: #0a1805;
+      border: 2px solid var(--hud-border);
+      border-top: none;
+      border-radius: 0 0 10px 10px;
+      position: relative;
+      touch-action: none;
+    }
+
+    #joystick-base {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #1a3d0a;
+      border: 2px solid var(--hud-border);
+      opacity: 0.6;
+    }
+
+    #joystick-thumb {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #b89600;
+      opacity: 0.85;
+      transition: opacity .1s;
+      pointer-events: none;
+    }
+
+    .hint {
+      position: absolute;
+      bottom: 6px;
+      right: 10px;
+      font-size: 6px;
+      color: #3a7224;
+    }
+
+    /* ── GAME OVER ───────────────────────────────────── */
+    #screen-dead { background: #1a0505; }
+    .dead-icon   { font-size: 56px; margin-bottom: 12px; animation: shake .4s ease; }
+    @keyframes shake {
+      0%,100% { transform: rotate(0); }
+      25%      { transform: rotate(-8deg); }
+      75%      { transform: rotate(8deg); }
+    }
+    .dead-title  { font-size: 22px; color: var(--red); margin-bottom: 14px; }
+    .stat-row    { font-size: 10px; margin: 6px 0; }
+    .stat-row span { color: var(--accent); }
+
+    /* ── LEVEL UP ────────────────────────────────────── */
+    #screen-levelup { background: #071a03; }
+    .levelup-icon  { font-size: 56px; margin-bottom: 12px; animation: spin .6s ease; }
+    @keyframes spin {
+      from { transform: rotate(-20deg) scale(.8); }
+      to   { transform: rotate(0) scale(1); }
+    }
+    .levelup-title { font-size: 18px; color: var(--accent); margin-bottom: 12px; }
+    .levelup-info  { font-size: 8px; color: #7ab55a; line-height: 2.2; margin-bottom: 24px; }
+    .levelup-warn  { font-size: 8px; color: var(--red); margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+  <!-- ══ MENU ══════════════════════════════════════════ -->
+  <div id="screen-menu" class="screen active">
+    <div class="menu-icon">🌲</div>
+    <div class="menu-title">COIN FOREST</div>
+    <div class="menu-sub">Sammle alle Münzen — überlebe die KI!</div>
+    <div class="info-panel">
+      <div>🪙 Coins auf der Map einsammeln</div>
+      <div>👾 Gegnern ausweichen</div>
+      <div>🧠 KI lernt mit jedem Level</div>
+      <div>📱 Touch-Joystick unten</div>
+      <div>⌨️ WASD / Pfeiltasten auch möglich</div>
+      <div>❤️ 3 Leben pro Runde</div>
+    </div>
+    <button class="btn btn-primary" onclick="startGame(1)">▶ SPIELEN</button>
+  </div>
+
+  <!-- ══ SPIEL ══════════════════════════════════════════ -->
+  <div id="screen-game" class="screen">
+    <div id="hud">
+      <div class="hud-block">
+        <div class="hud-label">LEVEL</div>
+        <div class="hud-value accent" id="hud-level">1</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">SCORE</div>
+        <div class="hud-value" id="hud-score">0</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">COINS</div>
+        <div class="hud-value" id="hud-coins">0/0</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">LEBEN</div>
+        <div class="hud-value danger" id="hud-lives">❤️❤️❤️</div>
+      </div>
+      <div class="hud-block">
+        <div class="hud-label">KI-IQ</div>
+        <div id="iq-bar-wrap"><div id="iq-bar"></div></div>
+        <div class="hud-value" id="hud-iq" style="font-size:7px">0</div>
+      </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="joystick-zone">
+      <div id="joystick-base"></div>
+      <div id="joystick-thumb"></div>
+      <div class="hint">⌨️ WASD / Pfeiltasten</div>
+    </div>
+  </div>
+
+  <!-- ══ GAME OVER ══════════════════════════════════════ -->
+  <div id="screen-dead" class="screen">
+    <div class="dead-icon">💀</div>
+    <div class="dead-title">GAME OVER</div>
+    <div class="stat-row">Level erreicht: <span id="dead-level">–</span></div>
+    <div class="stat-row">Score: <span id="dead-score">–</span></div>
+    <div class="stat-row">Coins: <span id="dead-coins">–</span></div>
+    <br>
+    <button class="btn btn-danger" onclick="startGame(1)">↩ Neu starten</button>
+  </div>
+
+  <!-- ══ LEVEL UP ═══════════════════════════════════════ -->
+  <div id="screen-levelup" class="screen">
+    <div class="levelup-icon">🎉</div>
+    <div class="levelup-title">LEVEL GESCHAFFT!</div>
+    <div class="levelup-warn" id="levelup-warn">🧠 KI-IQ steigt!</div>
+    <div class="levelup-info" id="levelup-info">
+      Mehr Gegner • Neue Map • Mehr Coins
+    </div>
+    <button class="btn btn-success" id="btn-next-level" onclick="nextLevel()">▶ WEITER</button>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
