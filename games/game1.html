@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Game 1 – 3D</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      background: #87CEEB;
+      touch-action: none;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* Three.js canvas füllt den Bildschirm */
+    canvas {
+      position: fixed !important;
+      top: 0; left: 0;
+      width: 100% !important;
+      height: 100% !important;
+      z-index: 0;
+    }
+
+    /* ── HUD ── */
+    #hud {
+      position: fixed; top: 16px; left: 16px; z-index: 10;
+      background: rgba(0,0,0,0.45);
+      color: #fff; font-size: 1rem; font-weight: 600;
+      padding: 8px 14px; border-radius: 8px;
+      pointer-events: none; user-select: none;
+    }
+
+    /* ── Zurück-Button ── */
+    #back-btn {
+      position: fixed; top: 16px; right: 16px; z-index: 10;
+      background: rgba(28,31,38,0.85); color: #ccc;
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 9px 18px; border-radius: 7px;
+      font-size: 0.85rem; cursor: pointer;
+      font-family: inherit;
+    }
+    #back-btn:hover, #back-btn:active { border-color: #4a90e2; color: #fff; }
+
+    /* ── Virtueller Joystick ── */
+    #joy-base {
+      position: fixed; bottom: 50px; left: 50px;
+      width: 110px; height: 110px; border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+      border: 2px solid rgba(255,255,255,0.3);
+      z-index: 10; pointer-events: none; user-select: none;
+    }
+    #joy-stick {
+      position: absolute; width: 46px; height: 46px;
+      border-radius: 50%;
+      left: 55px; top: 55px;
+      transform: translate(-50%, -50%);
+      background: rgba(74,144,226,0.65);
+      border: 2px solid #4a90e2;
+    }
+
+    /* ── Kamera-Hinweis ── */
+    #cam-hint {
+      position: fixed; bottom: 62px; right: 50px; z-index: 10;
+      color: rgba(255,255,255,0.35);
+      font-size: 0.72rem; text-align: center;
+      pointer-events: none; user-select: none; line-height: 1.5;
+    }
+
+    /* ── Gewinn-Banner ── */
+    #win-banner {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%); z-index: 20;
+      background: rgba(0,0,0,0.8); color: #e2c94e;
+      font-size: 1.4rem; font-weight: 700;
+      padding: 24px 40px; border-radius: 12px;
+      border: 2px solid #e2c94e; text-align: center;
+      display: none; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="hud">🪙 <span id="coin-count">0</span> / <span id="coin-total">20</span></div>
+
+  <button id="back-btn" onclick="
+    if (window.parent && window.parent.showLauncher) window.parent.showLauncher();
+    else window.location.href = '../index.html';
+  ">← Launcher</button>
+
+  <div id="joy-base"><div id="joy-stick"></div></div>
+  <div id="cam-hint">Drag right side<br>to rotate camera</div>
+
+  <div id="win-banner">
+    🎉 Alle Münzen gesammelt!<br>
+    <span style="font-size:0.85rem;font-weight:400;color:#fff">Neue Runde startet…</span>
+  </div>
+
+  <!-- Three.js r128 via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    'use strict';
+
+    /* ══════════════════════════════════════════════
+       KONSTANTEN
+    ══════════════════════════════════════════════ */
+    const WORLD_W       = 32;   // Spielfeldbreite (X)
+    const WORLD_D       = 64;   // Spielfeldtiefe  (Z)
+    const COIN_TOTAL    = 20;
+    const PLAYER_SPEED  = 7;    // Einheiten / Sekunde
+    const COLLECT_DIST  = 1.4;  // Sammelradius
+    const CAM_DIST_MIN  = 3;
+    const CAM_DIST_MAX  = 20;
+    const JOY_RADIUS    = 40;   // px, maximale Joystick-Auslenkung
+
+    /* ══════════════════════════════════════════════
+       SCENE / RENDERER / KAMERA
+    ══════════════════════════════════════════════ */
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB);
+    scene.fog = new THREE.Fog(0x87CEEB, 40, 95);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(
+      65,
+      window.innerWidth / window.innerHeight,
+      0.1, 150
+    );
+
+    // Kamera-Orbit-Zustand (horizontal-Winkel, vertikal-Winkel, Abstand)
+    const cam = { h: 0, v: 0.45, dist: 10 };
+
+    /* ══════════════════════════════════════════════
+       BELEUCHTUNG
+    ══════════════════════════════════════════════ */
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+    const sun = new THREE.DirectionalLight(0xfffde7, 1.1);
+    sun.position.set(15, 30, 15);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.near   = 0.5;
+    sun.shadow.camera.far    = 130;
+    sun.shadow.camera.left   = sun.shadow.camera.bottom = -50;
+    sun.shadow.camera.right  = sun.shadow.camera.top   =  50;
+    scene.add(sun);
+    scene.add(sun.target); // Ziel muss in der Szene sein
+
+    /* ══════════════════════════════════════════════
+       BODEN (Schachbrett-Textur, 32×64 Raster)
+    ══════════════════════════════════════════════ */
+    (function buildGround() {
+      const cellPx = 16;
+      const cvs = document.createElement('canvas');
+      cvs.width  = WORLD_W * cellPx;
+      cvs.height = WORLD_D * cellPx;
+      const ctx  = cvs.getContext('2d');
+
+      // Schachbrett
+      for (let x = 0; x < WORLD_W; x++) {
+        for (let z = 0; z < WORLD_D; z++) {
+          ctx.fillStyle = (x + z) % 2 === 0 ? '#4a7c59' : '#517e5f';
+          ctx.fillRect(x * cellPx, z * cellPx, cellPx, cellPx);
+        }
+      }
+      // Gitterlinien
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth   = 0.5;
+      for (let x = 0; x <= WORLD_W; x++) {
+        ctx.beginPath(); ctx.moveTo(x * cellPx, 0); ctx.lineTo(x * cellPx, cvs.height); ctx.stroke();
+      }
+      for (let z = 0; z <= WORLD_D; z++) {
+        ctx.beginPath(); ctx.moveTo(0, z * cellPx); ctx.lineTo(cvs.width, z * cellPx); ctx.stroke();
+      }
+
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(WORLD_W, WORLD_D),
+        new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(cvs) })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+    })();
+
+    /* ══════════════════════════════════════════════
+       DEKORATIVE BLÖCKE (Minecraft-Feeling)
+    ══════════════════════════════════════════════ */
+    (function addBlocks() {
+      const colors = [0x8B4513, 0x696969, 0x556B2F, 0x8B7355, 0x5C4033];
+      const geo    = new THREE.BoxGeometry(1, 1, 1);
+      for (let i = 0; i < 14; i++) {
+        const mesh = new THREE.Mesh(
+          geo,
+          new THREE.MeshLambertMaterial({ color: colors[i % colors.length] })
+        );
+        mesh.position.set(
+          (Math.random() - 0.5) * (WORLD_W - 6),
+          0.5,
+          (Math.random() - 0.5) * (WORLD_D - 6)
+        );
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+      }
+    })();
+
+    /* ══════════════════════════════════════════════
+       SPIELER (Minecraft-Block-Charakter)
+    ══════════════════════════════════════════════ */
+    const playerGroup = new THREE.Group();
+    scene.add(playerGroup);
+
+    // Materialien
+    const mSkin  = new THREE.MeshLambertMaterial({ color: 0xf5c99a });
+    const mShirt = new THREE.MeshLambertMaterial({ color: 0x1a6bb5 });
+    const mPants = new THREE.MeshLambertMaterial({ color: 0x2c2c7a });
+    const mHair  = new THREE.MeshLambertMaterial({ color: 0x2e1a0a });
+
+    // Kopf
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), mSkin);
+    head.position.y = 1.45;
+    head.castShadow = true;
+    playerGroup.add(head);
+
+    // Haare
+    const hair = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.17, 0.52), mHair);
+    hair.position.y = 1.72;
+    playerGroup.add(hair);
+
+    // Augen
+    const eyeGeo = new THREE.BoxGeometry(0.1, 0.08, 0.04);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    [-0.13, 0.13].forEach(ex => {
+      const eye = new THREE.Mesh(eyeGeo, eyeMat);
+      eye.position.set(ex, 1.45, 0.26);
+      playerGroup.add(eye);
+    });
+
+    // Körper
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.65, 0.28), mShirt);
+    body.position.y = 0.875;
+    body.castShadow = true;
+    playerGroup.add(body);
+
+    // Arm-Pivots (Drehpunkt = Schulter)
+    const armGeo   = new THREE.BoxGeometry(0.2, 0.6, 0.22);
+    const armPivL  = new THREE.Group(); armPivL.position.set(-0.36, 1.2, 0);
+    const armPivR  = new THREE.Group(); armPivR.position.set( 0.36, 1.2, 0);
+    const armMeshL = new THREE.Mesh(armGeo, mSkin); armMeshL.position.y = -0.3; armMeshL.castShadow = true;
+    const armMeshR = new THREE.Mesh(armGeo, mSkin); armMeshR.position.y = -0.3; armMeshR.castShadow = true;
+    armPivL.add(armMeshL); armPivR.add(armMeshR);
+    playerGroup.add(armPivL); playerGroup.add(armPivR);
+
+    // Bein-Pivots (Drehpunkt = Hüfte)
+    const legGeo   = new THREE.BoxGeometry(0.22, 0.55, 0.24);
+    const legPivL  = new THREE.Group(); legPivL.position.set(-0.14, 0.55, 0);
+    const legPivR  = new THREE.Group(); legPivR.position.set( 0.14, 0.55, 0);
+    const legMeshL = new THREE.Mesh(legGeo, mPants); legMeshL.position.y = -0.275; legMeshL.castShadow = true;
+    const legMeshR = new THREE.Mesh(legGeo, mPants); legMeshR.position.y = -0.275; legMeshR.castShadow = true;
+    legPivL.add(legMeshL); legPivR.add(legMeshR);
+    playerGroup.add(legPivL); playerGroup.add(legPivR);
+
+    /* ══════════════════════════════════════════════
+       MÜNZEN
+    ══════════════════════════════════════════════ */
+    const coinMeshes = [];
+    let coinCount = 0;
+
+    function spawnCoins() {
+      // Alte Münzen entfernen
+      coinMeshes.forEach(m => scene.remove(m));
+      coinMeshes.length = 0;
+      coinCount = 0;
+      document.getElementById('coin-count').textContent = 0;
+
+      const geo = new THREE.TorusGeometry(0.28, 0.09, 8, 16);
+      const mat = new THREE.MeshLambertMaterial({
+        color: 0xe2c94e,
+        emissive: new THREE.Color(0x7a5500),
+        emissiveIntensity: 0.35
+      });
+
+      for (let i = 0; i < COIN_TOTAL; i++) {
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(
+          (Math.random() - 0.5) * (WORLD_W - 3),
+          0.85,
+          (Math.random() - 0.5) * (WORLD_D - 3)
+        );
+        mesh.userData.active = true;
+        mesh.castShadow = true;
+        scene.add(mesh);
+        coinMeshes.push(mesh);
+      }
+      document.getElementById('coin-total').textContent = COIN_TOTAL;
+    }
+
+    spawnCoins();
+
+    /* ══════════════════════════════════════════════
+       TASTATUR-EINGABE
+    ══════════════════════════════════════════════ */
+    const keys = {};
+    window.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      // Standard-Scroll-Verhalten verhindern
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    });
+    window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+    /* ══════════════════════════════════════════════
+       TOUCH-STEUERUNG
+       – Linke Hälfte  → virtueller Joystick (Bewegung)
+       – Rechte Hälfte → Drag = Kamera-Rotation
+       – 2 Finger      → Pinch = Zoom
+    ══════════════════════════════════════════════ */
+    const joy    = { active: false, id: null, baseX: 0, baseY: 0, dx: 0, dy: 0 };
+    const camTch = { active: false, id: null, lastX: 0, lastY: 0 };
+    let pinchBase = null;  // { dist, camDist } beim Pinch-Start
+
+    const joyBaseEl  = document.getElementById('joy-base');
+    const joyStickEl = document.getElementById('joy-stick');
+
+    function resetJoystick() {
+      joy.active = false;
+      joy.dx = joy.dy = 0;
+      joyStickEl.style.left = '55px';
+      joyStickEl.style.top  = '55px';
+      joyBaseEl.style.left   = '50px';
+      joyBaseEl.style.top    = 'auto';
+      joyBaseEl.style.bottom = '50px';
+    }
+
+    renderer.domElement.addEventListener('touchstart', e => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        const isLeft = t.clientX < window.innerWidth / 2;
+        if (isLeft && !joy.active) {
+          // Joystick starten – Base an Touch-Position setzen
+          joy.active = true; joy.id = t.identifier;
+          joy.baseX = t.clientX; joy.baseY = t.clientY;
+          joy.dx = joy.dy = 0;
+          joyBaseEl.style.left   = (t.clientX - 55) + 'px';
+          joyBaseEl.style.top    = (t.clientY - 55) + 'px';
+          joyBaseEl.style.bottom = 'auto';
+        } else if (!isLeft && !camTch.active) {
+          // Kamera-Drag starten
+          camTch.active = true; camTch.id = t.identifier;
+          camTch.lastX = t.clientX; camTch.lastY = t.clientY;
+        }
+      }
+      // Pinch-Zoom starten
+      if (e.touches.length >= 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        pinchBase = { dist: Math.hypot(dx, dy), camDist: cam.dist };
+      }
+    }, { passive: false });
+
+    renderer.domElement.addEventListener('touchmove', e => {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (joy.active && t.identifier === joy.id) {
+          // Joystick-Auslenkung berechnen
+          const dx  = t.clientX - joy.baseX;
+          const dy  = t.clientY - joy.baseY;
+          const len = Math.hypot(dx, dy) || 1;
+          const clamp = Math.min(len, JOY_RADIUS);
+          joy.dx = (dx / len) * (clamp / JOY_RADIUS);
+          joy.dy = (dy / len) * (clamp / JOY_RADIUS);
+          // Stick-Position aktualisieren
+          joyStickEl.style.left = (55 + joy.dx * JOY_RADIUS) + 'px';
+          joyStickEl.style.top  = (55 + joy.dy * JOY_RADIUS) + 'px';
+        } else if (camTch.active && t.identifier === camTch.id) {
+          // Kamera drehen
+          cam.h -= (t.clientX - camTch.lastX) * 0.008;
+          cam.v  = Math.max(0.1, Math.min(1.2, cam.v + (t.clientY - camTch.lastY) * 0.008));
+          camTch.lastX = t.clientX; camTch.lastY = t.clientY;
+        }
+      }
+      // Pinch-Zoom
+      if (e.touches.length >= 2 && pinchBase) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const ratio = pinchBase.dist / Math.hypot(dx, dy);
+        cam.dist = Math.max(CAM_DIST_MIN, Math.min(CAM_DIST_MAX, pinchBase.camDist * ratio));
+      }
+    }, { passive: false });
+
+    function onTouchEnd(e) {
+      e.preventDefault();
+      for (const t of e.changedTouches) {
+        if (joy.active    && t.identifier === joy.id)    resetJoystick();
+        if (camTch.active && t.identifier === camTch.id) camTch.active = false;
+      }
+      if (e.touches.length < 2) pinchBase = null;
+    }
+    renderer.domElement.addEventListener('touchend',    onTouchEnd, { passive: false });
+    renderer.domElement.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    /* ══════════════════════════════════════════════
+       MAUS (Kamera-Rotation + Scroll-Zoom, Desktop)
+    ══════════════════════════════════════════════ */
+    let mouseDown = false, lastMX = 0, lastMY = 0;
+    renderer.domElement.addEventListener('mousedown', e => {
+      mouseDown = true; lastMX = e.clientX; lastMY = e.clientY;
+    });
+    window.addEventListener('mouseup',   ()  => { mouseDown = false; });
+    window.addEventListener('mousemove', e   => {
+      if (!mouseDown) return;
+      cam.h -= (e.clientX - lastMX) * 0.007;
+      cam.v  = Math.max(0.1, Math.min(1.2, cam.v + (e.clientY - lastMY) * 0.007));
+      lastMX = e.clientX; lastMY = e.clientY;
+    });
+    renderer.domElement.addEventListener('wheel', e => {
+      cam.dist = Math.max(CAM_DIST_MIN, Math.min(CAM_DIST_MAX, cam.dist + e.deltaY * 0.01));
+      e.preventDefault();
+    }, { passive: false });
+    renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+    /* ══════════════════════════════════════════════
+       RESIZE
+    ══════════════════════════════════════════════ */
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    /* ══════════════════════════════════════════════
+       GAME LOOP
+    ══════════════════════════════════════════════ */
+    const clock    = new THREE.Clock();
+    let elapsed    = 0;
+    let walkTime   = 0;
+    let winTimer   = 0;
+    let winShown   = false;
+    const lookAt   = new THREE.Vector3();
+
+    function update(dt) {
+
+      /* ── Bewegungseingabe (Tastatur + Joystick kombiniert) ── */
+      let mx = 0, mz = 0;
+      if (keys['ArrowLeft']  || keys['a'] || keys['A']) mx -= 1;
+      if (keys['ArrowRight'] || keys['d'] || keys['D']) mx += 1;
+      if (keys['ArrowUp']    || keys['w'] || keys['W']) mz -= 1;
+      if (keys['ArrowDown']  || keys['s'] || keys['S']) mz += 1;
+      if (joy.active) { mx += joy.dx; mz += joy.dy; }
+
+      const moving = mx !== 0 || mz !== 0;
+
+      if (moving) {
+        // Richtung relativ zum horizontalen Kamerawinkel
+        const wx =  mx * Math.cos(cam.h) + mz * Math.sin(cam.h);
+        const wz = -mx * Math.sin(cam.h) + mz * Math.cos(cam.h);
+        const len = Math.hypot(wx, wz) || 1;
+
+        playerGroup.position.x += (wx / len) * PLAYER_SPEED * dt;
+        playerGroup.position.z += (wz / len) * PLAYER_SPEED * dt;
+
+        // Weltgrenzen einhalten
+        playerGroup.position.x = Math.max(-(WORLD_W / 2 - 0.5), Math.min(WORLD_W / 2 - 0.5, playerGroup.position.x));
+        playerGroup.position.z = Math.max(-(WORLD_D / 2 - 0.5), Math.min(WORLD_D / 2 - 0.5, playerGroup.position.z));
+
+        // Spieler dreht sich in Bewegungsrichtung
+        playerGroup.rotation.y = Math.atan2(wx / len, wz / len);
+
+        // Laufanimation
+        walkTime += dt * 9;
+        const swing = Math.sin(walkTime) * 0.45;
+        legPivL.rotation.x =  swing;
+        legPivR.rotation.x = -swing;
+        armPivL.rotation.x = -swing * 0.55;
+        armPivR.rotation.x =  swing * 0.55;
+      } else {
+        // Gleitend in Ruheposition zurückkehren
+        legPivL.rotation.x *= 0.85;
+        legPivR.rotation.x *= 0.85;
+        armPivL.rotation.x *= 0.85;
+        armPivR.rotation.x *= 0.85;
+      }
+
+      /* ── Kamera hinter/über Spieler positionieren ── */
+      camera.position.set(
+        playerGroup.position.x + cam.dist * Math.sin(cam.h) * Math.cos(cam.v),
+        playerGroup.position.y + cam.dist * Math.sin(cam.v) + 1.5,
+        playerGroup.position.z + cam.dist * Math.cos(cam.h) * Math.cos(cam.v)
+      );
+      lookAt.set(playerGroup.position.x, playerGroup.position.y + 1.0, playerGroup.position.z);
+      camera.lookAt(lookAt);
+
+      // Sonnenlicht dem Spieler folgen lassen
+      sun.target.position.copy(playerGroup.position);
+
+      /* ── Münzen animieren + einsammeln ── */
+      for (const mesh of coinMeshes) {
+        if (!mesh.userData.active) continue;
+
+        // Drehen und schweben
+        mesh.rotation.y  = elapsed * 2.5;
+        mesh.position.y  = 0.85 + Math.sin(elapsed * 2 + mesh.position.x) * 0.14;
+
+        // Kollisionsprüfung
+        const dx = mesh.position.x - playerGroup.position.x;
+        const dz = mesh.position.z - playerGroup.position.z;
+        if (Math.hypot(dx, dz) < COLLECT_DIST) {
+          mesh.userData.active = false;
+          scene.remove(mesh);
+          coinCount++;
+          document.getElementById('coin-count').textContent = coinCount;
+        }
+      }
+
+      /* ── Rundenende ── */
+      if (!winShown && coinCount >= COIN_TOTAL) {
+        winShown = true;
+        winTimer = 2.5;
+        document.getElementById('win-banner').style.display = 'block';
+      }
+      if (winShown) {
+        winTimer -= dt;
+        if (winTimer <= 0) {
+          winShown = false;
+          document.getElementById('win-banner').style.display = 'none';
+          spawnCoins();
+        }
+      }
+    }
+
+    function loop() {
+      const dt = Math.min(clock.getDelta(), 0.05); // max 50 ms / Frame
+      elapsed += dt;
+      update(dt);
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
