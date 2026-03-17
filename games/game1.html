@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Game 1</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111317;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 16px 12px;
+      gap: 14px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Münz-Anzeige ── */
+    #hud {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1rem;
+      color: #e2c94e;
+      font-weight: 600;
+      align-self: flex-start;
+    }
+
+    #hud span { color: #fff; }
+
+    /* ── Canvas ── */
+    canvas {
+      display: block;
+      border: 1px solid #2a2d35;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+      /* skaliert sich auf kleinere Screens */
+      max-width: 100%;
+      max-height: 55vh;
+    }
+
+    /* ── Mobile Steuerung ── */
+    #dpad {
+      display: grid;
+      grid-template-areas:
+        ". up ."
+        "left . right"
+        ". down .";
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    #dpad button {
+      width: 56px;
+      height: 56px;
+      background: #1c1f26;
+      border: 1px solid #2a2d35;
+      border-radius: 10px;
+      color: #ccc;
+      font-size: 1.3rem;
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #dpad button:active { background: #2a3040; border-color: #4a90e2; color: #fff; }
+
+    #btn-up    { grid-area: up;    }
+    #btn-left  { grid-area: left;  }
+    #btn-right { grid-area: right; }
+    #btn-down  { grid-area: down;  }
+
+    /* ── Zurück-Button ── */
+    #back-btn {
+      color: #888;
+      background: #1c1f26;
+      border: 1px solid #2a2d35;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      touch-action: manipulation;
+    }
+
+    #back-btn:hover, #back-btn:active { border-color: #4a90e2; color: #fff; }
+  </style>
+</head>
+<body>
+
+  <!-- ── HUD ── -->
+  <div id="hud">🪙 Münzen: <span id="coin-count">0</span></div>
+
+  <!-- ── Canvas ── -->
+  <canvas id="canvas"></canvas>
+
+  <!-- ── Mobile D-Pad ── -->
+  <div id="dpad">
+    <button id="btn-up">▲</button>
+    <button id="btn-left">◀</button>
+    <button id="btn-right">▶</button>
+    <button id="btn-down">▼</button>
+  </div>
+
+  <!-- ── Zurück ── -->
+  <button id="back-btn" onclick="window.parent.showLauncher()">← Zurück zum Launcher</button>
+
+  <script>
+    // ════════════════════════════════
+    //  KONFIGURATION
+    // ════════════════════════════════
+    const COLS        = 32;
+    const ROWS        = 64;
+    const CELL        = 10;          // Pixel pro Rasterzelle
+    const PLAYER_SIZE = CELL - 2;    // Spieler-Quadrat
+    const COIN_RADIUS = 3;           // Münz-Radius in Pixel
+    const COIN_COUNT  = 20;          // Anzahl Münzen auf dem Feld
+    const SPEED       = 3;           // Bewegung in Pixel/Frame
+
+    // ════════════════════════════════
+    //  CANVAS SETUP
+    // ════════════════════════════════
+    const canvas = document.getElementById("canvas");
+    canvas.width  = COLS * CELL;   // 320px
+    canvas.height = ROWS * CELL;   // 640px
+    const ctx = canvas.getContext("2d");
+
+    // ════════════════════════════════
+    //  SPIELER
+    // ════════════════════════════════
+    const player = {
+      x: Math.floor(COLS / 2) * CELL,
+      y: Math.floor(ROWS / 2) * CELL,
+    };
+
+    // ════════════════════════════════
+    //  MÜNZEN
+    // ════════════════════════════════
+    let coins = [];
+    let coinCount = 0;
+
+    // Münze an zufälliger Gitterposition erzeugen
+    function spawnCoin() {
+      return {
+        x: (Math.floor(Math.random() * COLS) + 0.5) * CELL,
+        y: (Math.floor(Math.random() * ROWS) + 0.5) * CELL,
+      };
+    }
+
+    // Startmünzen verteilen
+    function initCoins() {
+      coins = [];
+      for (let i = 0; i < COIN_COUNT; i++) coins.push(spawnCoin());
+    }
+
+    initCoins();
+
+    // ════════════════════════════════
+    //  TASTATUR-EINGABE (PC)
+    // ════════════════════════════════
+    const keys = {};
+    document.addEventListener("keydown", e => { keys[e.key] = true;  e.preventDefault(); });
+    document.addEventListener("keyup",   e => { keys[e.key] = false; });
+
+    // ════════════════════════════════
+    //  TOUCH-EINGABE (Mobile D-Pad)
+    // ════════════════════════════════
+    // touchKeys spiegelt keys für D-Pad-Buttons
+    const touchKeys = { up: false, down: false, left: false, right: false };
+
+    function bindDpad(id, dir) {
+      const btn = document.getElementById(id);
+      btn.addEventListener("touchstart", e => { touchKeys[dir] = true;  e.preventDefault(); }, { passive: false });
+      btn.addEventListener("touchend",   e => { touchKeys[dir] = false; e.preventDefault(); }, { passive: false });
+      // Auch Maus für Desktop-Tests
+      btn.addEventListener("mousedown",  () => touchKeys[dir] = true);
+      btn.addEventListener("mouseup",    () => touchKeys[dir] = false);
+      btn.addEventListener("mouseleave", () => touchKeys[dir] = false);
+    }
+
+    bindDpad("btn-up",    "up");
+    bindDpad("btn-down",  "down");
+    bindDpad("btn-left",  "left");
+    bindDpad("btn-right", "right");
+
+    // ════════════════════════════════
+    //  UPDATE
+    // ════════════════════════════════
+    function update() {
+      // Bewegungsrichtung aus Tastatur + D-Pad kombinieren
+      let dx = 0, dy = 0;
+
+      if (keys["ArrowLeft"]  || keys["a"] || touchKeys.left)  dx -= SPEED;
+      if (keys["ArrowRight"] || keys["d"] || touchKeys.right) dx += SPEED;
+      if (keys["ArrowUp"]    || keys["w"] || touchKeys.up)    dy -= SPEED;
+      if (keys["ArrowDown"]  || keys["s"] || touchKeys.down)  dy += SPEED;
+
+      // Grenzen einhalten
+      player.x = Math.max(0, Math.min(canvas.width  - PLAYER_SIZE, player.x + dx));
+      player.y = Math.max(0, Math.min(canvas.height - PLAYER_SIZE, player.y + dy));
+
+      // Münzen einsammeln (Mittelpunkt-Kollision)
+      const px = player.x + PLAYER_SIZE / 2;
+      const py = player.y + PLAYER_SIZE / 2;
+
+      coins = coins.filter(coin => {
+        const dist = Math.hypot(coin.x - px, coin.y - py);
+        if (dist < CELL) {
+          coinCount++;
+          document.getElementById("coin-count").textContent = coinCount;
+          return false;   // Münze entfernen
+        }
+        return true;
+      });
+
+      // Alle Münzen eingesammelt → neue verteilen
+      if (coins.length === 0) initCoins();
+    }
+
+    // ════════════════════════════════
+    //  ZEICHNEN
+    // ════════════════════════════════
+    function draw() {
+      // Hintergrund
+      ctx.fillStyle = "#1c1f26";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Raster
+      ctx.strokeStyle = "#23262e";
+      ctx.lineWidth = 0.5;
+      for (let x = 0; x <= COLS; x++) {
+        ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y <= ROWS; y++) {
+        ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(canvas.width, y * CELL); ctx.stroke();
+      }
+
+      // Münzen
+      ctx.fillStyle = "#e2c94e";
+      coins.forEach(coin => {
+        ctx.beginPath();
+        ctx.arc(coin.x, coin.y, COIN_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Spieler
+      ctx.fillStyle = "#4a90e2";
+      ctx.fillRect(player.x, player.y, PLAYER_SIZE, PLAYER_SIZE);
+    }
+
+    // ════════════════════════════════
+    //  GAME LOOP
+    // ════════════════════════════════
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+
+</body>
+</html>
