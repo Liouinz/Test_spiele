@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <title>Forest Explorer</title>
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+    html,body{width:100%;height:100%;overflow:hidden;background:#080f18;
+      font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+      touch-action:none;-webkit-user-select:none;user-select:none;}
+
+    /* ── Canvas ─── */
+    #canvas-container{position:fixed;inset:0;}
+    #canvas-container canvas{display:block;width:100%!important;height:100%!important;}
+
+    /* ── HUD ─── */
+    #hud{position:fixed;inset:0;pointer-events:none;z-index:10;}
+
+    /* Coin counter */
+    #coin-counter{
+      position:absolute;top:max(env(safe-area-inset-top,0px),14px);left:16px;margin-top:4px;
+      color:#fff;font-size:1.2rem;font-weight:700;letter-spacing:.02em;
+      text-shadow:0 2px 6px rgba(0,0,0,.9);
+      background:linear-gradient(135deg,rgba(0,0,0,.65),rgba(0,0,0,.45));
+      padding:7px 16px;border-radius:30px;border:1px solid rgba(255,220,50,.35);
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      transition:transform .15s cubic-bezier(.34,1.56,.64,1);
+    }
+    #coin-counter.pulse{transform:scale(1.28);}
+
+    /* Score */
+    #score-counter{
+      position:absolute;top:max(env(safe-area-inset-top,0px),14px);right:16px;margin-top:4px;
+      color:#ff8855;font-size:1rem;font-weight:700;
+      text-shadow:0 2px 6px rgba(0,0,0,.9);
+      background:rgba(0,0,0,.5);padding:7px 14px;border-radius:30px;
+      border:1px solid rgba(255,100,50,.35);backdrop-filter:blur(6px);
+    }
+
+    /* ── Crosshair ─── */
+    #crosshair{
+      position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:22px;height:22px;pointer-events:none;
+    }
+    #crosshair::before,#crosshair::after{
+      content:'';position:absolute;background:rgba(255,255,255,.85);border-radius:1px;
+      box-shadow:0 0 3px rgba(0,0,0,.8);
+    }
+    #crosshair::before{width:2px;height:22px;left:10px;top:0;}
+    #crosshair::after{width:22px;height:2px;top:10px;left:0;}
+    /* Center dot gap */
+    #crosshair-dot{
+      position:absolute;top:50%;left:50%;
+      width:4px;height:4px;background:rgba(255,255,255,.9);border-radius:50%;
+      transform:translate(-50%,-50%);
+      box-shadow:0 0 4px rgba(0,0,0,.8);
+    }
+
+    /* ── Hitmarker ─── */
+    #hitmarker{
+      position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      color:#fff;font-size:1.5rem;font-weight:900;line-height:1;
+      opacity:0;pointer-events:none;
+      text-shadow:0 0 6px rgba(0,0,0,1);
+      transition:color .05s;
+    }
+
+    /* ── Weapon HUD ─── */
+    #weapon-hud{
+      position:absolute;bottom:max(env(safe-area-inset-bottom,0px),22px);
+      right:16px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;
+      pointer-events:none;
+    }
+    #weapon-desc{
+      color:rgba(255,255,255,.45);font-size:.72rem;letter-spacing:.04em;
+      text-shadow:0 1px 4px rgba(0,0,0,.9);text-align:right;
+    }
+    #weapon-main{
+      display:flex;align-items:center;gap:12px;
+      background:linear-gradient(135deg,rgba(0,0,0,.7),rgba(0,0,0,.5));
+      padding:10px 18px;border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    }
+    #weapon-icon{font-size:1.8rem;line-height:1;}
+    #weapon-info{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+    #weapon-name{color:#fff;font-size:1.1rem;font-weight:700;letter-spacing:.01em;}
+    #ammo-counter{font-size:1.05rem;font-weight:600;color:#fff;font-variant-numeric:tabular-nums;}
+
+    /* Reload bar */
+    #reload-bar-wrap{
+      width:140px;height:4px;background:rgba(255,255,255,.12);border-radius:99px;
+      overflow:hidden;opacity:0;transition:opacity .2s;
+    }
+    #reload-bar{height:100%;width:0;background:linear-gradient(90deg,#ff8800,#ffdd00);border-radius:99px;transition:width .05s linear;}
+
+    /* ── Weapon Slots ─── */
+    #weapon-slots{
+      position:absolute;bottom:max(env(safe-area-inset-bottom,0px),22px);
+      left:50%;transform:translateX(-50%);
+      display:flex;gap:5px;pointer-events:none;
+    }
+    .weapon-slot{
+      width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+      font-size:1.15rem;line-height:1;
+      background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.15);
+      backdrop-filter:blur(4px);
+      transition:transform .12s,border-color .12s,background .12s;
+      opacity:.65;
+    }
+    .weapon-slot.active{
+      background:rgba(255,255,255,.18);border-color:rgba(255,200,50,.8);
+      transform:scale(1.18) translateY(-3px);opacity:1;
+      box-shadow:0 3px 12px rgba(255,180,0,.35);
+    }
+
+    /* ── PC Controls Hint ─── */
+    #controls-hint{
+      position:absolute;bottom:80px;right:16px;
+      color:rgba(255,255,255,.38);font-size:.7rem;line-height:1.7;text-align:right;
+      text-shadow:0 1px 3px rgba(0,0,0,.8);pointer-events:none;
+    }
+    @media(hover:none){#controls-hint{display:none;}}
+
+    /* ── Mobile Controls ─── */
+    #mobile-controls{
+      position:absolute;bottom:max(env(safe-area-inset-bottom,0px),12px);
+      width:100%;display:none;justify-content:space-between;align-items:flex-end;
+      padding:0 16px 4px;pointer-events:none;
+    }
+    /* Joystick */
+    #joystick-container{display:none;align-items:flex-end;pointer-events:all;}
+    #joystick-base{
+      width:116px;height:116px;border-radius:50%;
+      background:radial-gradient(circle at 40% 35%,rgba(255,255,255,.16),rgba(255,255,255,.04));
+      border:2px solid rgba(255,255,255,.26);display:flex;align-items:center;justify-content:center;
+      backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+      box-shadow:0 4px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.12);
+    }
+    #joystick-thumb{
+      width:48px;height:48px;border-radius:50%;
+      background:radial-gradient(circle at 38% 35%,rgba(255,255,255,.8),rgba(200,200,220,.5));
+      border:2px solid rgba(255,255,255,.55);
+      box-shadow:0 3px 12px rgba(0,0,0,.3);will-change:transform;
+    }
+    /* Right side buttons */
+    #mobile-right{display:none;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:all;}
+    #fire-btn{
+      width:80px;height:80px;border-radius:50%;
+      background:radial-gradient(circle at 40% 35%,rgba(255,80,50,.85),rgba(200,30,10,.75));
+      border:2px solid rgba(255,150,100,.6);
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.8rem;line-height:1;
+      box-shadow:0 4px 20px rgba(255,60,0,.4);
+      transition:transform .08s,box-shadow .08s;
+      cursor:pointer;
+    }
+    #fire-btn:active{transform:scale(.92);box-shadow:0 2px 10px rgba(255,60,0,.5);}
+    .mobile-btn-row{display:flex;gap:8px;}
+    .mob-btn{
+      width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+      font-size:1.1rem;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);
+      backdrop-filter:blur(4px);cursor:pointer;
+    }
+    @media(hover:none){
+      #joystick-container{display:flex;}
+      #mobile-right{display:flex;}
+      #weapon-slots{bottom:170px;}
+      #weapon-hud{bottom:170px;}
+      #controls-hint{display:none;}
+    }
+
+    /* ── Collect Flash ─── */
+    #collect-flash{
+      position:fixed;inset:0;
+      background:radial-gradient(circle,rgba(255,220,50,.55) 0%,transparent 70%);
+      pointer-events:none;opacity:0;transition:opacity .1s ease;z-index:20;
+    }
+
+    /* ── Win Screen ─── */
+    #win-screen{
+      position:fixed;inset:0;
+      background:radial-gradient(ellipse at center,rgba(10,20,40,.93),rgba(0,0,0,.97));
+      display:none;flex-direction:column;align-items:center;justify-content:center;
+      z-index:100;opacity:0;transition:opacity .6s ease;pointer-events:all;
+    }
+    #win-screen h1{font-size:clamp(2rem,6vw,3.5rem);color:#FFD700;
+      text-shadow:0 0 40px rgba(255,215,0,.8),0 3px 8px rgba(0,0,0,.9);
+      margin-bottom:1rem;animation:glow 2s ease-in-out infinite;}
+    #win-screen p{color:rgba(255,255,255,.75);font-size:1.1rem;margin-bottom:2rem;}
+    #win-screen button{
+      padding:14px 40px;font-size:1rem;font-weight:700;color:#0b1520;
+      background:linear-gradient(135deg,#FFD700,#FFA500);border:none;border-radius:40px;
+      cursor:pointer;box-shadow:0 4px 20px rgba(255,180,0,.5);transition:transform .15s;
+    }
+    #win-screen button:hover{transform:scale(1.05);}
+    @keyframes glow{
+      0%,100%{text-shadow:0 0 30px rgba(255,215,0,.7),0 3px 8px rgba(0,0,0,.9);}
+      50%{text-shadow:0 0 60px rgba(255,215,0,1),0 3px 8px rgba(0,0,0,.9);}
+    }
+
+    /* ── Loading Screen ─── */
+    #loading-screen{
+      position:fixed;inset:0;
+      background:linear-gradient(160deg,#080f18 0%,#0d1f35 50%,#080e20 100%);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      z-index:200;opacity:1;transition:opacity .5s ease;
+    }
+    .load-trees{font-size:2.8rem;margin-bottom:1rem;animation:bob 2s ease-in-out infinite;}
+    .load-logo{font-size:clamp(2rem,5.5vw,3rem);font-weight:900;color:#fff;letter-spacing:-.02em;
+      margin-bottom:.3rem;text-shadow:0 0 40px rgba(100,200,255,.35);}
+    .load-logo span{color:#4fc3f7;}
+    .load-sub{color:rgba(255,255,255,.35);font-size:.85rem;margin-bottom:2.2rem;
+      letter-spacing:.14em;text-transform:uppercase;}
+    #loading-bar-wrap{width:min(300px,78vw);height:5px;background:rgba(255,255,255,.07);
+      border-radius:99px;overflow:hidden;}
+    #loading-bar{height:100%;width:0%;
+      background:linear-gradient(90deg,#4fc3f7,#0288d1,#4fc3f7);background-size:200%;
+      border-radius:99px;animation:shimmer 1.4s linear infinite;}
+    .load-hint{margin-top:1.8rem;color:rgba(255,255,255,.22);font-size:.74rem;letter-spacing:.06em;}
+    @keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+    @keyframes shimmer{0%{background-position:0% 50%;}100%{background-position:200% 50%;}}
+  </style>
+</head>
+<body>
+
+<!-- 3D Canvas -->
+<div id="canvas-container"></div>
+
+<!-- HUD -->
+<div id="hud">
+
+  <!-- Top Left: Coins -->
+  <div id="coin-counter">🪙 0 / 30</div>
+
+  <!-- Top Right: Score -->
+  <div id="score-counter">💥 0 Kills · 0 pts</div>
+
+  <!-- Center: Crosshair -->
+  <div id="crosshair"></div>
+  <div id="crosshair-dot"></div>
+
+  <!-- Center: Hitmarker -->
+  <div id="hitmarker">✕</div>
+
+  <!-- Center Bottom: Weapon Slots -->
+  <div id="weapon-slots"></div>
+
+  <!-- Bottom Right: Weapon Info -->
+  <div id="weapon-hud">
+    <div id="weapon-desc">Präzise · kompakt</div>
+    <div id="weapon-main">
+      <div id="weapon-icon">🔫</div>
+      <div id="weapon-info">
+        <div id="weapon-name">Pistole</div>
+        <div id="ammo-counter">12 / 12</div>
+        <div id="reload-bar-wrap"><div id="reload-bar"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop Controls Hint -->
+  <div id="controls-hint">
+    WASD · Pfeiltasten &nbsp;|&nbsp; Ziehen = Kamera<br>
+    LMB = Schießen &nbsp;|&nbsp; R = Reload<br>
+    1–0 = Waffe · Scroll = wechseln<br>
+    Q/E = vorherige / nächste Waffe
+  </div>
+
+</div>
+
+<!-- Mobile Controls (outside HUD pointer-events:none) -->
+<div style="position:fixed;bottom:0;left:0;right:0;z-index:11;pointer-events:none;display:flex;justify-content:space-between;align-items:flex-end;padding:0 20px max(env(safe-area-inset-bottom,0px),16px);">
+  <!-- Left: Joystick -->
+  <div id="joystick-container" style="pointer-events:all;">
+    <div id="joystick-base">
+      <div id="joystick-thumb"></div>
+    </div>
+  </div>
+  <!-- Right: Fire + Weapon buttons -->
+  <div id="mobile-right" style="display:none;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:all;">
+    <div class="mobile-btn-row">
+      <button class="mob-btn" id="prev-weapon">◀</button>
+      <button class="mob-btn" id="next-weapon">▶</button>
+    </div>
+    <div id="fire-btn">🔴</div>
+  </div>
+</div>
+
+<!-- Collect Flash -->
+<div id="collect-flash"></div>
+
+<!-- Win Screen -->
+<div id="win-screen">
+  <div class="load-trees">🌲🏆🌲</div>
+  <h1>Du hast gewonnen!</h1>
+  <p>Alle Münzen gesammelt — großartig!</p>
+  <button onclick="location.reload()">🔄 Nochmal spielen</button>
+</div>
+
+<!-- Loading Screen -->
+<div id="loading-screen">
+  <div class="load-trees">🌲🌳🌲</div>
+  <div class="load-logo">Forest<span>Explorer</span></div>
+  <div class="load-sub">Weapon Edition</div>
+  <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+  <div class="load-hint" id="load-hint">Welt wird generiert …</div>
+</div>
+
+<!-- Mobile right panel toggle -->
+<script>
+  if('ontouchstart' in window||navigator.maxTouchPoints>0){
+    document.getElementById('mobile-right').style.display='flex';
+  }
+</script>
+
+<!-- Three.js Import Map -->
+<script type="importmap">
+{
+  "imports": {
+    "three":          "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/":  "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
