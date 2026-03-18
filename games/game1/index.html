@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Slime Slayer – Game 1</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Three.js via CDN (ES module build) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.158.0/build/three.module.js"
+    }
+  }
+  </script>
+  <!-- NippleJS for mobile joystick (UMD, sets window.nipplejs) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js" defer></script>
+</head>
+<body>
+
+<!-- ── Three.js render target ───────────────────────────────────────────── -->
+<div id="game-canvas"></div>
+
+<!-- ── HUD ──────────────────────────────────────────────────────────────── -->
+<div id="hud" aria-hidden="true">
+
+  <!-- Health bar -->
+  <div id="health-bar-wrapper">
+    <div class="hud-label"><span class="icon">❤️</span> Health</div>
+    <div id="health-bar-bg"><div id="health-fill"></div></div>
+    <div id="health-label">100 / 100</div>
+  </div>
+
+  <!-- Coin counter (center top) -->
+  <div id="coin-area">
+    <span id="coin-icon">🪙</span>
+    <span id="coin-count">0</span>
+  </div>
+
+  <!-- Score / kills (top right) -->
+  <div id="top-right">
+    <div class="stat-badge">
+      <span class="icon">⭐</span>
+      <span id="score-value">0</span>
+    </div>
+    <div class="stat-badge">
+      <span class="icon">💀</span>
+      <span id="kills-value">0</span>
+    </div>
+  </div>
+
+  <!-- Inventory bar (bottom center) -->
+  <div id="inventory-bar"></div>
+
+  <!-- Weapon info (above inventory) -->
+  <div id="weapon-info">
+    <span id="weapon-name">Iron Sword</span>
+    <span id="weapon-damage">DMG 25</span>
+  </div>
+
+  <!-- Controls hint (bottom right) -->
+  <div id="attack-hint">WASD Move &nbsp;·&nbsp; Space Jump &nbsp;·&nbsp; F Attack &nbsp;·&nbsp; Esc Pause</div>
+
+  <!-- Launcher button (hidden by default, shown in pause menu) -->
+  <button id="launcher-btn" aria-label="Back to Launcher">🏠</button>
+</div>
+
+<!-- ── Pause Menu ────────────────────────────────────────────────────────── -->
+<div id="pause-menu" class="menu-overlay" role="dialog" aria-modal="true">
+  <div class="menu-card">
+    <div class="menu-title">⏸ Paused</div>
+    <div class="menu-subtitle">Take a breather, adventurer</div>
+    <button id="btn-resume"         class="menu-btn primary">▶ Resume</button>
+    <button id="btn-restart-pause"  class="menu-btn neutral">🔄 Restart</button>
+    <button id="btn-launcher-pause" class="menu-btn neutral">🏠 Back to Launcher</button>
+    <div class="key-hint"><kbd>Esc</kbd> to resume</div>
+  </div>
+</div>
+
+<!-- ── Game Over Menu ────────────────────────────────────────────────────── -->
+<div id="gameover-menu" class="menu-overlay" role="dialog" aria-modal="true">
+  <div class="menu-card">
+    <div class="menu-title">💀 Game Over</div>
+    <div class="menu-subtitle">You fought bravely!</div>
+    <div id="go-new-record">🏆 New Highscore!</div>
+    <div class="go-stats">
+      <div class="go-stat">
+        <div class="stat-label">Score</div>
+        <div class="stat-num" id="go-score" style="color:var(--gold)">0</div>
+      </div>
+      <div class="go-stat">
+        <div class="stat-label">Best</div>
+        <div class="stat-num" id="go-best" style="color:#aaa">0</div>
+      </div>
+      <div class="go-stat">
+        <div class="stat-label">Coins</div>
+        <div class="stat-num" id="go-coins" style="color:var(--gold)">0</div>
+      </div>
+      <div class="go-stat">
+        <div class="stat-label">Kills</div>
+        <div class="stat-num" id="go-kills" style="color:#FF6B8A">0</div>
+      </div>
+    </div>
+    <button id="btn-restart-gameover"  class="menu-btn primary">🔄 Try Again</button>
+    <button id="btn-launcher-gameover" class="menu-btn neutral">🏠 Back to Launcher</button>
+  </div>
+</div>
+
+<!-- ── Settings Menu ─────────────────────────────────────────────────────── -->
+<div id="settings-menu" class="menu-overlay" role="dialog" aria-modal="true">
+  <div class="menu-card">
+    <div class="menu-title">⚙️ Settings</div>
+    <div class="menu-subtitle">Audio is disabled in this build</div>
+    <button id="btn-close-settings" class="menu-btn primary">Close</button>
+  </div>
+</div>
+
+<!-- ── Mobile Controls ───────────────────────────────────────────────────── -->
+<div id="mobile-controls">
+  <div id="joystick-zone"></div>
+  <div id="mobile-buttons">
+    <button id="btn-jump"   class="mobile-btn">↑</button>
+    <button id="btn-attack" class="mobile-btn">⚔</button>
+  </div>
+</div>
+
+<!-- ── Loading Screen ────────────────────────────────────────────────────── -->
+<div id="loading-screen">
+  <div class="loading-title">Slime Slayer</div>
+  <div class="loading-sub">Building world…</div>
+  <div class="loading-bar-bg">
+    <div id="loading-bar-fill"></div>
+  </div>
+</div>
+
+<!-- ── Game entry point ──────────────────────────────────────────────────── -->
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
