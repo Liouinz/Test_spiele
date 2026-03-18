@@ -1,0 +1,388 @@
+/* style.css - Global styles for the game UI */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+/* ── Reset & Base ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary:  #4A90E2;
+  --danger:   #E74C3C;
+  --success:  #2ECC71;
+  --gold:     #F1C40F;
+  --dark:     rgba(0, 0, 0, 0.78);
+  --radius:   10px;
+  --font:     'Nunito', sans-serif;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #1a1a2e;
+  font-family: var(--font);
+  color: #fff;
+  user-select: none;
+}
+
+/* ── Canvas ────────────────────────────────────────────────────────────────── */
+#game-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+}
+#game-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── HUD ───────────────────────────────────────────────────────────────────── */
+#hud {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+/* Health bar */
+#health-bar-wrapper {
+  position: absolute;
+  top: 18px; left: 18px;
+  width: 220px;
+}
+.hud-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.75);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hud-label .icon { font-size: 14px; }
+
+#health-bar-bg {
+  background: rgba(0,0,0,0.5);
+  border-radius: 6px;
+  height: 16px;
+  overflow: hidden;
+  border: 1.5px solid rgba(255,255,255,0.15);
+}
+#health-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #2ECC71, #27AE60);
+  border-radius: 5px;
+  transition: width 0.2s ease, background 0.3s;
+}
+#health-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.6);
+  margin-top: 3px;
+  text-align: right;
+}
+
+/* Score & kills */
+#top-right {
+  position: absolute;
+  top: 18px; right: 18px;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stat-badge {
+  background: var(--dark);
+  border-radius: var(--radius);
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.stat-badge .icon { font-size: 16px; }
+#score-value { color: var(--gold); }
+#kills-value { color: #FF6B8A; }
+
+/* Coin counter */
+#coin-area {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--dark);
+  border-radius: 20px;
+  padding: 5px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+#coin-icon { font-size: 18px; }
+#coin-count { color: var(--gold); }
+
+/* Inventory bar */
+#inventory-bar {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  pointer-events: all;
+}
+.inv-slot {
+  width: 52px; height: 52px;
+  background: var(--dark);
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  transition: transform 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.inv-slot.active {
+  border-color: var(--primary);
+  background: rgba(74,144,226,0.25);
+  transform: translateY(-3px);
+}
+.inv-icon { pointer-events: none; }
+
+/* Weapon info */
+#weapon-info {
+  position: absolute;
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--dark);
+  border-radius: 8px;
+  padding: 4px 14px;
+  font-size: 12px;
+  text-align: center;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  gap: 14px;
+}
+#weapon-name   { font-weight: 700; }
+#weapon-damage { color: #FF6B8A; font-weight: 600; }
+
+/* Launcher button */
+#launcher-btn {
+  position: absolute;
+  top: 18px; left: 18px;
+  width: 36px; height: 36px;
+  background: var(--dark);
+  border: none;
+  border-radius: 8px;
+  font-size: 20px;
+  cursor: pointer;
+  pointer-events: all;
+  display: none; /* shown via JS if needed separately */
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+#launcher-btn:hover { background: rgba(255,255,255,0.2); }
+
+/* Attack button hint */
+#attack-hint {
+  position: absolute;
+  bottom: 22px; right: 18px;
+  background: var(--dark);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.6);
+  pointer-events: none;
+}
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@keyframes shake {
+  0%,100%{ transform: translateX(0); }
+  25%    { transform: translateX(-5px); }
+  75%    { transform: translateX(5px); }
+}
+.shake { animation: shake 0.25s ease; }
+
+@keyframes pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.pop { animation: pop 0.2s ease; }
+
+/* ── Menus (shared overlay base) ───────────────────────────────────────────── */
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  backdrop-filter: blur(6px);
+}
+.menu-card {
+  background: linear-gradient(145deg, rgba(30,30,60,0.97), rgba(20,20,40,0.97));
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 20px;
+  padding: 38px 44px;
+  min-width: 320px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.menu-title {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.menu-subtitle {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+  margin-bottom: 28px;
+}
+.menu-btn {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  margin-bottom: 10px;
+  border: none;
+  border-radius: 12px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.menu-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
+.menu-btn:active { transform: translateY(0); }
+.menu-btn.primary { background: linear-gradient(135deg, #4A90E2, #357ABD); color: #fff; }
+.menu-btn.danger  { background: linear-gradient(135deg, #E74C3C, #C0392B); color: #fff; }
+.menu-btn.neutral { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); }
+
+/* Game Over stats grid */
+.go-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.go-stat {
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 10px;
+}
+.go-stat .stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.45);
+}
+.go-stat .stat-num {
+  font-size: 22px;
+  font-weight: 800;
+}
+#go-new-record {
+  color: var(--gold);
+  font-weight: 800;
+  font-size: 15px;
+  margin-bottom: 16px;
+  display: none;
+}
+
+/* Pause menu key hints */
+.key-hint {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  margin-top: 16px;
+}
+kbd {
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+/* ── Mobile controls ───────────────────────────────────────────────────────── */
+#mobile-controls {
+  position: fixed;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  z-index: 200;
+}
+#joystick-zone {
+  position: absolute;
+  bottom: 30px; left: 30px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,255,255,0.15);
+  pointer-events: all;
+}
+#mobile-buttons {
+  position: absolute;
+  bottom: 30px; right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+.mobile-btn {
+  width: 62px; height: 62px;
+  border-radius: 50%;
+  border: none;
+  font-size: 24px;
+  font-weight: 800;
+  cursor: pointer;
+  pointer-events: all;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  transition: transform 0.1s;
+}
+.mobile-btn:active { transform: scale(0.92); }
+#btn-jump   { background: linear-gradient(135deg, #4A90E2, #357ABD); color: #fff; }
+#btn-attack { background: linear-gradient(135deg, #E74C3C, #C0392B); color: #fff; }
+
+/* ── Loading screen ────────────────────────────────────────────────────────── */
+#loading-screen {
+  position: fixed;
+  inset: 0;
+  background: #0f0f1e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity 0.5s;
+}
+#loading-screen.hidden { opacity: 0; pointer-events: none; }
+.loading-title { font-size: 32px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+.loading-sub   { font-size: 14px; color: rgba(255,255,255,0.45); margin-bottom: 32px; }
+.loading-bar-bg {
+  width: 240px; height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+#loading-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #4A90E2, #2ECC71);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
