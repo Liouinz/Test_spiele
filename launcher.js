@@ -4,7 +4,7 @@ const games = [
     title: "Game 1",
     image: "https://placehold.co/400x200/1a1a2e/4a90e2?text=Game+1",
     description: "Ein spannendes Abenteuer wartet auf dich. Erkunde unbekannte Welten.",
-    url: "games/game1/game1.html"
+    url: "games/game1/index.html"
   },
   {
     title: "Game 2",
