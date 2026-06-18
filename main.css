@@ -1,0 +1,11 @@
+/* ====================================================
+   SUBSTRATE — Main Stylesheet
+   Importiert alle Teil-Module in der richtigen
+   Reihenfolge (Cascade-bewusst, siehe Kommentare).
+   ==================================================== */
+
+@import url('base.css');           /* Tokens, Reset, Typografie */
+@import url('nav-scan.css');       /* Scan-Overlay + Navigation */
+@import url('hero.css');           /* Hero + Intro-Strip */
+@import url('components.css');     /* Komponenten-Sektionen */
+@import url('roadmap-footer.css'); /* Roadmap + Footer */
