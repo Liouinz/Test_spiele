@@ -1,0 +1,193 @@
+/* ====================================================
+   SCAN OVERLAY — Signature Element
+   Eine CT-Scanner-artige Linie, die durch die ganze
+   Seite wandert und das "Durchleuchten" der Hardware
+   visuell verkörpert.
+   ==================================================== */
+
+.scan-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--line-cyan) 15%,
+    #ffffff 50%,
+    var(--line-cyan) 85%,
+    transparent 100%);
+  box-shadow: 0 0 12px 1px var(--line-cyan), 0 0 40px 4px var(--line-cyan-dim);
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.scan-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--line-cyan-dim) 1px, transparent 1px);
+  background-size: 100% 120px;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease-out);
+}
+
+/* ====================================================
+   NAVIGATION
+   ==================================================== */
+
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--nav-height);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-5);
+  background: rgba(10, 14, 20, 0.7);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-hairline);
+  transition: border-color 0.3s var(--ease-out);
+}
+
+.nav__logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  z-index: 2;
+}
+
+.nav__logo-mark {
+  color: var(--line-cyan);
+  font-size: 1.4rem;
+  line-height: 1;
+  text-shadow: 0 0 16px var(--line-cyan);
+}
+
+.nav__list {
+  display: flex;
+  gap: var(--space-5);
+  align-items: center;
+}
+
+.nav__list a {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  transition: color 0.25s var(--ease-out);
+  position: relative;
+  padding: var(--space-2) 0;
+}
+
+.nav__num {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+}
+
+.nav__list a:hover,
+.nav__list a.active {
+  color: var(--line-cyan);
+}
+
+.nav__list a.active .nav__num {
+  color: var(--line-cyan);
+}
+
+.nav__list a::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1px;
+  background: var(--line-cyan);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s var(--ease-out);
+}
+
+.nav__list a:hover::after,
+.nav__list a.active::after {
+  transform: scaleX(1);
+}
+
+.nav__progress {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  width: 0%;
+  background: var(--line-cyan);
+  box-shadow: 0 0 8px var(--line-cyan);
+  transition: width 0.1s linear;
+}
+
+.nav__toggle {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 2;
+  padding: var(--space-2);
+}
+
+.nav__toggle span {
+  width: 22px;
+  height: 1.5px;
+  background: var(--text-primary);
+  transition: transform 0.3s var(--ease-out), opacity 0.3s var(--ease-out);
+}
+
+.nav__toggle[aria-expanded="true"] span:nth-child(1) {
+  transform: translateY(6.5px) rotate(45deg);
+}
+.nav__toggle[aria-expanded="true"] span:nth-child(2) {
+  opacity: 0;
+}
+.nav__toggle[aria-expanded="true"] span:nth-child(3) {
+  transform: translateY(-6.5px) rotate(-45deg);
+}
+
+@media (max-width: 880px) {
+  .nav__toggle { display: flex; }
+
+  .nav__list {
+    position: fixed;
+    top: var(--nav-height);
+    left: 0; right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: rgba(10, 14, 20, 0.97);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-hairline);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s var(--ease-out);
+  }
+
+  .nav__list.open {
+    max-height: 70vh;
+  }
+
+  .nav__list a {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border-hairline);
+    font-size: 0.9rem;
+  }
+
+  .nav__list a::after { display: none; }
+}
